@@ -19,7 +19,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # LLM configuration
 GROQ_MODEL = os.getenv(
     "GROQ_MODEL",
-    "llama-3.3-70b-versatile",
+    "openai/gpt-oss-120b"
 )
 
 
@@ -34,8 +34,8 @@ EMBEDDING_MODEL = os.getenv(
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "700"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "120"))
 
-TOP_K = int(os.getenv("TOP_K", "3"))
-MIN_SIMILARITY = float(os.getenv("MIN_SIMILARITY", "0.25"))
+TOP_K = int(os.getenv("TOP_K", "5"))
+MIN_SIMILARITY = float(os.getenv("MIN_SIMILARITY", "0.05"))
 
 
 # Application directories
