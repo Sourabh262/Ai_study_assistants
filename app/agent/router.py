@@ -57,16 +57,28 @@ GREETING_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+GENERAL_QUERY_PATTERN = re.compile(
+    r"""
+    (
+        \b(today['\s]*s?\s*date|current\s*date|what\s+is\s+the\s+(today\s+)?date|date\s+is\s+what|what\s+date\s+is\s+it|what\s+day\s+is\s+it)\b
+        |
+        \b(who\s+are\s+you|what\s+is\s+your\s+name|what\s+can\s+you\s+do)\b
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
 
 def route_question(question: str, has_document: bool = False) -> ToolName:
     """
     Decide which tool should handle the user's question.
 
     Priority:
-    1. Pure greetings -> Direct LLM
+    1. Pure greetings or general date/identity questions -> Direct LLM
     2. Mathematical questions -> Calculator
-    3. Document-specific questions or loaded document -> Document Search
-    4. General fallback -> Direct LLM
+    3. Explicit document keywords -> Document Search
+    4. If document is loaded -> Document Search
+    5. Fallback -> Direct LLM
     """
 
     if not question or not question.strip():
@@ -78,6 +90,14 @@ def route_question(question: str, has_document: bool = False) -> ToolName:
     if GREETING_PATTERN.match(normalized):
         logger.info(
             "Agent route: DIRECT_LLM (greeting) | question=%s",
+            question,
+        )
+        return ToolName.DIRECT_LLM
+
+    # General queries like today's date or bot identity stay direct LLM
+    if GENERAL_QUERY_PATTERN.search(normalized):
+        logger.info(
+            "Agent route: DIRECT_LLM (general query) | question=%s",
             question,
         )
         return ToolName.DIRECT_LLM
@@ -111,4 +131,4 @@ def route_question(question: str, has_document: bool = False) -> ToolName:
         question,
     )
 
-    return ToolName.DIRECT_LLM
+    return ToolName.DIRECT_LLM

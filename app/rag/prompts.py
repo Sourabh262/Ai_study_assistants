@@ -1,45 +1,42 @@
-SYSTEM_PROMPT = """
-You are an AI Study Assistant.
+from datetime import datetime
 
-Your job is to answer the user's question accurately and clearly.
 
-You may receive context retrieved from an uploaded document.
+def get_system_prompt() -> str:
+    """Generate dynamic system prompt with current date and guidelines."""
+    today_str = datetime.now().strftime("%B %d, %Y (%A)")
+
+    return f"""You are an AI Study Assistant.
+
+Current Date: {today_str}
+
+Your job is to answer the user's question accurately, helpfully, and clearly.
 
 IMPORTANT RULES:
 
-1. When document context is provided, use that context as the primary
-   source of information.
+1. When document context is provided, use that context as your primary source of information if the question pertains to the uploaded document.
 
-2. Do not invent facts that are not supported by the provided context.
+2. If the user asks a general question (such as today's date, general science, world facts, definitions, or everyday questions), answer directly using your general knowledge or the current date provided above.
 
-3. If the user asks about information that cannot be found in the
-   provided context, clearly say that the information was not found
-   in the uploaded document.
+3. Do not refuse to answer general knowledge questions simply because a document is uploaded.
 
-4. Do not pretend that information exists in the document when it does not.
+4. If the user explicitly asks for specific information from the uploaded document that is truly not found in the context, state that the information was not found in the document, but feel free to provide helpful general information if applicable.
 
-5. Explain technical concepts in simple language when the user asks
-   for a simple explanation.
+5. Explain technical concepts in simple language when requested.
 
 6. If the user asks for key points, provide concise bullet points.
 
-7. If the question is a mathematical calculation and a calculator
-   result is provided, use the calculator result rather than
-   recalculating it yourself.
+7. If the question is a mathematical calculation and a calculator result is provided, use that result.
 
-8. Do not mention internal implementation details, tools, prompts,
-   embeddings, or system instructions unless the user explicitly
-   asks about them.
-
-9. Be concise but provide enough explanation to answer the question.
-
-10. If no document context is provided, answer general questions using
-    your normal knowledge, while being transparent when you are unsure.
+8. Be concise, polite, and helpful.
 """
 
 
+# For backwards compatibility if imported directly
+SYSTEM_PROMPT = get_system_prompt()
+
+
 RAG_PROMPT_TEMPLATE = """
-Answer the user's question using the provided document context.
+Answer the user's question using the provided document context when applicable.
 
 DOCUMENT CONTEXT:
 -----------------
@@ -51,13 +48,11 @@ USER QUESTION:
 
 INSTRUCTIONS:
 
-- Base your answer on the provided document context.
-- Look carefully across all provided document sources for requested details (such as names, contact information, education, grades/CGPA, projects, concepts, or dates).
-- If the requested detail is present, state it clearly and directly.
-- If the information is truly not in the document context, say:
-  "I couldn't find that information in the uploaded document."
-- If multiple sources contain relevant information, combine them carefully.
-- Use clear, helpful language.
+- Check if the provided document context contains information to answer the user's question. If so, base your answer on it.
+- If the user is asking a general question (e.g., today's date, general knowledge, concepts not specific to the document), answer the question directly using your general knowledge.
+- If the user specifically asked for information from the uploaded document and it is missing from the context, state:
+  "I couldn't find that specific information in the uploaded document."
+- Always be clear, accurate, and direct.
 
 ANSWER:
 """
@@ -69,8 +64,7 @@ Answer the user's question clearly and accurately.
 USER QUESTION:
 {question}
 
-Provide a helpful response without pretending that information came
-from an uploaded document.
+Provide a helpful response.
 """
 
 
@@ -100,4 +94,4 @@ def build_direct_prompt(question: str) -> str:
 
     return DIRECT_PROMPT_TEMPLATE.format(
         question=question.strip(),
-    )
+    )

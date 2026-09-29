@@ -4,7 +4,7 @@ from app.config import GROQ_API_KEY, GROQ_MODEL
 from app.exceptions import LLMError
 from app.logging_config import logger
 from app.rag.prompts import (
-    SYSTEM_PROMPT,
+    get_system_prompt,
     build_direct_prompt,
     build_rag_prompt,
 )
@@ -57,7 +57,7 @@ class LLMGenerator:
                 messages=[
                     {
                         "role": "system",
-                        "content": SYSTEM_PROMPT,
+                        "content": get_system_prompt(),
                     },
                     {
                         "role": "user",
