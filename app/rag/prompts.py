@@ -36,9 +36,9 @@ SYSTEM_PROMPT = get_system_prompt()
 
 
 RAG_PROMPT_TEMPLATE = """
-Answer the user's question using the provided document context when applicable.
+Answer the user's question clearly and accurately.
 
-DOCUMENT CONTEXT:
+DOCUMENT CONTEXT FROM UPLOADED FILE:
 -----------------
 {context}
 -----------------
@@ -48,11 +48,9 @@ USER QUESTION:
 
 INSTRUCTIONS:
 
-- Check if the provided document context contains information to answer the user's question. If so, base your answer on it.
-- If the user is asking a general question (e.g., today's date, general knowledge, concepts not specific to the document), answer the question directly using your general knowledge.
-- If the user specifically asked for information from the uploaded document and it is missing from the context, state:
-  "I couldn't find that specific information in the uploaded document."
-- Always be clear, accurate, and direct.
+1. If the provided document context contains relevant details to answer the question (e.g., specific details about a project, person, grades, resume details, or document topics), prioritize and reference those document details.
+2. If the user's question is a general concept, programming language definition, educational topic, or general knowledge question (such as "what is python", "explain machine learning", "what is photosynthesis", etc.), ALWAYS provide a complete, clear, and helpful explanation using your general knowledge, integrating any document context if relevant.
+3. NEVER reply with refusal phrases like "I couldn't find that information in the uploaded document" for general knowledge or conceptual questions. Provide the answer directly to the user.
 
 ANSWER:
 """

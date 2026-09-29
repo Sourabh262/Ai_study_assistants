@@ -131,12 +131,7 @@ class StudyAssistantAgent:
 
         if any(phrase in answer.lower() for phrase in unfound_phrases):
             logger.info("Information not present in document; providing direct LLM answer.")
-            direct_response = self._run_direct_llm(question)
-            return AgentResponse(
-                answer=f"*(Not found in uploaded document)*\n\n{direct_response.answer}",
-                tool_used=ToolName.DIRECT_LLM,
-                sources=[],
-            )
+            return self._run_direct_llm(question)
 
         sources = [
             f"Source {index}: similarity={chunk.score:.3f}"
