@@ -104,10 +104,39 @@ class StudyAssistantAgent:
             logger.info("No matching document chunks found; falling back to direct LLM.")
             return self._run_direct_llm(question)
 
+        # Check similarity score of retrieved chunks
+        max_score = max((chunk.score for chunk in result.chunks), default=0.0)
+
+        # If similarity score is very low, the question is likely unrelated to the document content
+        if max_score < 0.20:
+            logger.info(
+                "Document search max score too low (%.3f); falling back to direct LLM.",
+                max_score,
+            )
+            return self._run_direct_llm(question)
+
         answer = self.llm.generate_with_context(
             question=question,
             context=result.context,
         )
+
+        unfound_phrases = [
+            "couldn't find that specific information",
+            "couldn't find that information",
+            "not found in the uploaded document",
+            "information is not present in the document",
+            "document does not mention",
+            "not mentioned in the uploaded document",
+        ]
+
+        if any(phrase in answer.lower() for phrase in unfound_phrases):
+            logger.info("Information not present in document; providing direct LLM answer.")
+            direct_response = self._run_direct_llm(question)
+            return AgentResponse(
+                answer=f"*(Not found in uploaded document)*\n\n{direct_response.answer}",
+                tool_used=ToolName.DIRECT_LLM,
+                sources=[],
+            )
 
         sources = [
             f"Source {index}: similarity={chunk.score:.3f}"
