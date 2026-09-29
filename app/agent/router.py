@@ -8,6 +8,7 @@ class ToolName(str, Enum):
     CALCULATOR = "calculator"
     DOCUMENT_SEARCH = "document_search"
     DIRECT_LLM = "direct_llm"
+    MULTI_TOOL = "multi_tool"
 
 
 MATH_PATTERN = re.compile(
@@ -69,16 +70,53 @@ GENERAL_QUERY_PATTERN = re.compile(
 )
 
 
+def is_compound_math_question(question: str) -> bool:
+    """
+    Check if a question containing math also asks an additional non-math question.
+    """
+    cleaned = question.lower()
+    # Remove numbers and math symbols
+    cleaned = re.sub(r"[\d\+\-\*\/\%\^\(\)\=]", " ", cleaned)
+    # Remove common math query filler words
+    math_fillers = [
+        r"\bcalculate\b",
+        r"\bcompute\b",
+        r"\bsolve\b",
+        r"\bevaluate\b",
+        r"\bwhat is\b",
+        r"\bwhat's\b",
+        r"\bhow much is\b",
+        r"\bresult of\b",
+        r"\bvalue of\b",
+        r"\bthe answer\b",
+        r"\bof\b",
+        r"\band\b",
+        r"\bplus\b",
+        r"\bminus\b",
+        r"\btimes\b",
+        r"\bdivided by\b",
+        r"\bmultiplied by\b",
+        r"\bequals\b",
+        r"\bplease\b",
+    ]
+    for filler in math_fillers:
+        cleaned = re.sub(filler, " ", cleaned)
+
+    words = [w for w in re.findall(r"\b[a-zA-Z]{2,}\b", cleaned)]
+    return len(words) > 0
+
+
 def route_question(question: str, has_document: bool = False) -> ToolName:
     """
     Decide which tool should handle the user's question.
 
     Priority:
     1. Pure greetings or general date/identity questions -> Direct LLM
-    2. Mathematical questions -> Calculator
-    3. Explicit document keywords -> Document Search
-    4. If document is loaded -> Document Search
-    5. Fallback -> Direct LLM
+    2. Compound questions (concept + math) -> Multi Tool
+    3. Pure mathematical questions -> Calculator
+    4. Explicit document keywords -> Document Search
+    5. If document is loaded -> Document Search
+    6. Fallback -> Direct LLM
     """
 
     if not question or not question.strip():
@@ -104,6 +142,13 @@ def route_question(question: str, has_document: bool = False) -> ToolName:
 
     # Mathematical expressions/questions.
     if MATH_PATTERN.search(normalized):
+        if is_compound_math_question(normalized):
+            logger.info(
+                "Agent route: MULTI_TOOL (compound question with math) | question=%s",
+                question,
+            )
+            return ToolName.MULTI_TOOL
+
         logger.info(
             "Agent route: CALCULATOR | question=%s",
             question,

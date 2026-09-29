@@ -56,6 +56,9 @@ class StudyAssistantAgent:
             if selected_tool == ToolName.CALCULATOR:
                 return self._run_calculator(question)
 
+            if selected_tool == ToolName.MULTI_TOOL:
+                return self._run_multi_tool(question, has_document=has_document)
+
             if selected_tool == ToolName.DOCUMENT_SEARCH:
                 return self._run_document_search(question)
 
@@ -83,6 +86,61 @@ class StudyAssistantAgent:
         return AgentResponse(
             answer=f"The answer is **{formatted_result}**.",
             tool_used=ToolName.CALCULATOR,
+            sources=[],
+        )
+
+    def _run_multi_tool(self, question: str, has_document: bool) -> AgentResponse:
+        """
+        Handle compound questions that involve both mathematical calculation
+        and conceptual / document inquiries.
+        """
+        calc_result_str = None
+        try:
+            expression = self._extract_expression(question)
+            result = calculate(expression)
+            formatted_result = format_result(result)
+            calc_result_str = f"{expression} = {formatted_result}"
+        except Exception as exc:
+            logger.warning("Could not pre-calculate expression in multi-tool: %s", exc)
+
+        compound_prompt = f"""The user asked a multi-part question:
+"{question}"
+
+{f"The mathematical calculation was solved by the calculator tool: {calc_result_str}" if calc_result_str else ""}
+
+INSTRUCTIONS:
+1. Provide a comprehensive, accurate answer to the non-mathematical part of the question (such as concepts, definitions, or document inquiries).
+2. Clearly state the mathematical calculation result ({calc_result_str if calc_result_str else "as computed"}).
+3. Address both parts of the user's inquiry thoroughly.
+"""
+
+        sources = []
+        if has_document and self.document_search is not None:
+            doc_result = self.document_search.search(question)
+            max_score = max((chunk.score for chunk in doc_result.chunks), default=0.0)
+            if doc_result.found and max_score >= 0.25:
+                rag_prompt = f"""DOCUMENT CONTEXT FROM UPLOADED FILE:
+-----------------
+{doc_result.context}
+-----------------
+
+{compound_prompt}
+"""
+                answer = self.llm._generate(rag_prompt)
+                sources = [
+                    f"Source {index}: similarity={chunk.score:.3f}"
+                    for index, chunk in enumerate(doc_result.chunks, start=1)
+                ]
+                return AgentResponse(
+                    answer=answer,
+                    tool_used=ToolName.MULTI_TOOL,
+                    sources=sources,
+                )
+
+        answer = self.llm._generate(compound_prompt)
+        return AgentResponse(
+            answer=answer,
+            tool_used=ToolName.MULTI_TOOL,
             sources=[],
         )
 
