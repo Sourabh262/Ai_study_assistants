@@ -1,6 +1,6 @@
 from groq import Groq
 
-from app.config import GROQ_API_KEY, GROQ_MODEL
+from app.config import GROQ_API_KEY, GROQ_MODEL, get_env_variable
 from app.exceptions import LLMError
 from app.logging_config import logger
 from app.rag.prompts import (
@@ -15,18 +15,20 @@ class LLMGenerator:
 
     def __init__(
         self,
-        api_key: str | None = GROQ_API_KEY,
-        model: str = GROQ_MODEL,
+        api_key: str | None = None,
+        model: str | None = None,
     ) -> None:
-        if not api_key:
+        key = api_key or GROQ_API_KEY or get_env_variable("GROQ_API_KEY")
+
+        if not key:
             raise LLMError(
                 "GROQ_API_KEY is not configured."
             )
 
-        self.model = model
+        self.model = model or GROQ_MODEL or "openai/gpt-oss-120b"
 
         try:
-            self.client = Groq(api_key=api_key)
+            self.client = Groq(api_key=key)
 
         except Exception as exc:
             logger.error(

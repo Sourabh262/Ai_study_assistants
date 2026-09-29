@@ -12,12 +12,26 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def get_env_variable(var_name: str, default: str | None = None) -> str | None:
+    """Retrieve an environment variable from os.environ or Streamlit secrets."""
+    val = os.getenv(var_name)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and var_name in st.secrets:
+            return str(st.secrets[var_name])
+    except Exception:
+        pass
+    return default
+
+
 # Environment
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_KEY = get_env_variable("GROQ_API_KEY")
 
 
 # LLM configuration
-GROQ_MODEL = os.getenv(
+GROQ_MODEL = get_env_variable(
     "GROQ_MODEL",
     "openai/gpt-oss-120b"
 )
