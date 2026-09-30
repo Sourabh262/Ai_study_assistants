@@ -10,6 +10,48 @@ from app.tools.calculator import calculate, format_result
 from app.tools.document_search import DocumentSearchTool
 
 
+def is_unfound_response(text: str) -> bool:
+    """Check if the model indicates the requested information was not found or is absent."""
+    lowered = text.lower()
+    indicators = [
+        "couldn't find",
+        "could not find",
+        "cannot find",
+        "can't find",
+        "not found",
+        "not mentioned",
+        "does not mention",
+        "doesn't mention",
+        "not present",
+        "not provided",
+        "does not provide",
+        "doesn't provide",
+        "does not contain",
+        "doesn't contain",
+        "don't have any information",
+        "do not have any information",
+        "don't have information",
+        "do not have information",
+        "no information about",
+        "no information is available",
+        "no information available",
+        "no mention of",
+        "not specified",
+        "not stated",
+        "not available in the",
+        "i don't have your",
+        "i do not have your",
+        "i don't know your",
+        "i do not know your",
+        "i don't have access to your",
+        "i do not have access to your",
+        "unable to find",
+        "not in the document",
+        "not in the uploaded",
+    ]
+    return any(phrase in lowered for phrase in indicators)
+
+
 @dataclass
 class AgentResponse:
     answer: str
@@ -127,10 +169,12 @@ INSTRUCTIONS:
 {compound_prompt}
 """
                 answer = self.llm._generate(rag_prompt)
-                sources = [
-                    f"Source {index}: similarity={chunk.score:.3f}"
-                    for index, chunk in enumerate(doc_result.chunks, start=1)
-                ]
+                sources = []
+                if not is_unfound_response(answer):
+                    sources = [
+                        f"Source {index}: similarity={chunk.score:.3f}"
+                        for index, chunk in enumerate(doc_result.chunks, start=1)
+                    ]
                 return AgentResponse(
                     answer=answer,
                     tool_used=ToolName.MULTI_TOOL,
@@ -152,7 +196,7 @@ INSTRUCTIONS:
                     "No document is currently loaded. "
                     "Please upload a TXT or PDF document first."
                 ),
-                tool_used=ToolName.DOCUMENT_SEARCH,
+                tool_used=ToolName.DIRECT_LLM,
                 sources=[],
             )
 
@@ -164,16 +208,11 @@ INSTRUCTIONS:
 
         # Check similarity score of retrieved chunks
         max_score = max((chunk.score for chunk in result.chunks), default=0.0)
-        is_small_doc = (
-            self.retriever is not None
-            and self.retriever.vector_store.document_count <= 5
-        )
         explicit_doc = is_document_query(question)
 
-        # If similarity score is very low, and it is NOT an explicit document query
-        # and NOT a small document (where all chunks are available context),
-        # the question is likely a general question unrelated to the document content.
-        if max_score < 0.18 and not explicit_doc and not is_small_doc:
+        # If similarity score is very low, and it is NOT an explicit document query,
+        # the question is a general question unrelated to the document content.
+        if max_score < 0.20 and not explicit_doc:
             logger.info(
                 "Document search max score too low (%.3f) for non-document query; falling back to direct LLM.",
                 max_score,
@@ -185,19 +224,22 @@ INSTRUCTIONS:
             context=result.context,
         )
 
-        unfound_phrases = [
-            "couldn't find that specific information",
-            "couldn't find that information",
-            "not found in the uploaded document",
-            "information is not present in the document",
-            "document does not mention",
-            "not mentioned in the uploaded document",
-        ]
+        # If the model indicates the information was NOT found or not available in the document:
+        if is_unfound_response(answer):
+            logger.info("Information not present in document or model has no info.")
+            # If the user did not explicitly ask about the document, provide a clean direct LLM answer
+            if not explicit_doc:
+                return self._run_direct_llm(question)
 
-        if any(phrase in answer.lower() for phrase in unfound_phrases) and not explicit_doc:
-            logger.info("Information not present in document; providing direct LLM answer.")
-            return self._run_direct_llm(question)
+            # If the user explicitly asked about the document, keep the answer explaining it was not found,
+            # but do NOT return sources and attribute to direct_llm.
+            return AgentResponse(
+                answer=answer,
+                tool_used=ToolName.DIRECT_LLM,
+                sources=[],
+            )
 
+        # Only provide sources and attribute to document_search when the document actually supplied the answer!
         sources = [
             f"Source {index}: similarity={chunk.score:.3f}"
             for index, chunk in enumerate(

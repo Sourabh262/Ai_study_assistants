@@ -83,7 +83,11 @@ GENERAL_QUERY_PATTERN = re.compile(
     (
         \b(today['\s]*s?\s*date|current\s*date|what\s+is\s+the\s+(today\s+)?date|date\s+is\s+what|what\s+date\s+is\s+it|what\s+day\s+is\s+it)\b
         |
-        \b(who\s+are\s+you|what\s+is\s+your\s+name|what\s+can\s+you\s+do)\b
+        \b(who\s+are\s+you|what\s+is\s+your\s+name|what\s+can\s+you\s+do|how\s+are\s+you|how\s+do\s+you\s+do|who\s+(made|created)\s+you)\b
+        |
+        \b(tell\s+me\s+a\s+joke|say\s+a\s+joke|make\s+me\s+laugh|write\s+a\s+poem|tell\s+a\s+story)\b
+        |
+        ^(thanks|thank\s+you|thanks\s+a\s+lot|bye|goodbye|see\s+you|ok|okay|cool|nice|great)[!.,? ]*$
     )
     """,
     re.IGNORECASE | re.VERBOSE,
