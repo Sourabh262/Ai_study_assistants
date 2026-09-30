@@ -11,19 +11,21 @@ from app.rag.vector_store import SearchResult, VectorStore
 def clean_search_query(query: str) -> str:
     """Strip conversational filler like 'according to the document' before embedding."""
     fillers = [
-        r"(?i)\baccording to the (document|file|resume|cv|pdf)\b",
-        r"(?i)\bin the (document|file|resume|cv|pdf)\b",
-        r"(?i)\bfrom the (document|file|resume|cv|pdf)\b",
-        r"(?i)\buploaded (document|file|resume|cv|pdf)\b",
-        r"(?i)\bwhich i (have )?attached\b",
-        r"(?i)\bi have uploaded my (resume|document|cv|file|pdf)\b",
+        r"(?i)\baccording to (the|my) (document|file|resume|cv|pdf|book)\b",
+        r"(?i)\b(in|from|of) (the )?(document|file|resume|cv|pdf|book)\b",
+        r"(?i)\buploaded (document|file|resume|cv|pdf|book)\b",
+        r"(?i)\bwhich i (have )?(attached|uploaded)\b",
+        r"(?i)\bi have uploaded (my )?(resume|document|cv|file|pdf|book)?\b",
         r"(?i)\baccording to my (resume|cv|document|file)\b",
+        r"(?i)\b\w+\.(txt|pdf)\b",
+        r"(?i)\b(document|file)\b",
     ]
     cleaned = query
     for f in fillers:
         cleaned = re.sub(f, "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned or query
+
 
 
 @dataclass

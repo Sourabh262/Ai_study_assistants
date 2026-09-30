@@ -59,7 +59,8 @@ def process_uploaded_file(uploaded_file) -> None:
 
             chunk_count = (
                 st.session_state.document_service.process_file(
-                    temp_path
+                    temp_path,
+                    original_file_name=uploaded_file.name,
                 )
             )
 

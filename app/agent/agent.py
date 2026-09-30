@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from app.agent.router import ToolName, route_question
+from app.agent.router import ToolName, is_document_query, route_question
 from app.exceptions import AgentError
 from app.logging_config import logger
 from app.rag.generator import LLMGenerator
@@ -164,11 +164,18 @@ INSTRUCTIONS:
 
         # Check similarity score of retrieved chunks
         max_score = max((chunk.score for chunk in result.chunks), default=0.0)
+        is_small_doc = (
+            self.retriever is not None
+            and self.retriever.vector_store.document_count <= 5
+        )
+        explicit_doc = is_document_query(question)
 
-        # If similarity score is very low, the question is likely unrelated to the document content
-        if max_score < 0.20:
+        # If similarity score is very low, and it is NOT an explicit document query
+        # and NOT a small document (where all chunks are available context),
+        # the question is likely a general question unrelated to the document content.
+        if max_score < 0.18 and not explicit_doc and not is_small_doc:
             logger.info(
-                "Document search max score too low (%.3f); falling back to direct LLM.",
+                "Document search max score too low (%.3f) for non-document query; falling back to direct LLM.",
                 max_score,
             )
             return self._run_direct_llm(question)
@@ -187,7 +194,7 @@ INSTRUCTIONS:
             "not mentioned in the uploaded document",
         ]
 
-        if any(phrase in answer.lower() for phrase in unfound_phrases):
+        if any(phrase in answer.lower() for phrase in unfound_phrases) and not explicit_doc:
             logger.info("Information not present in document; providing direct LLM answer.")
             return self._run_direct_llm(question)
 

@@ -44,6 +44,12 @@ DOCUMENT_KEYWORDS = {
     "paper",
     "assignment",
     "report",
+    "book",
+    "summary",
+    "summarize",
+    "conclusion",
+    "overview",
+    "uploaded",
     "my name",
     "my cgpa",
     "my gpa",
@@ -53,10 +59,24 @@ DOCUMENT_KEYWORDS = {
     "who am i",
 }
 
+
+def is_document_query(question: str) -> bool:
+    """Check if the user is explicitly inquiring about an uploaded document."""
+    if not question:
+        return False
+    normalized = question.strip().lower()
+    if any(keyword in normalized for keyword in DOCUMENT_KEYWORDS):
+        return True
+    if re.search(r"\b\w+\.(txt|pdf)\b", normalized):
+        return True
+    return False
+
+
 GREETING_PATTERN = re.compile(
     r"^(hi|hello|hey|greetings|howdy|good morning|good afternoon|good evening)[!.,? ]*$",
     re.IGNORECASE,
 )
+
 
 GENERAL_QUERY_PATTERN = re.compile(
     r"""
@@ -156,7 +176,7 @@ def route_question(question: str, has_document: bool = False) -> ToolName:
         return ToolName.CALCULATOR
 
     # Explicit document keywords
-    if any(keyword in normalized for keyword in DOCUMENT_KEYWORDS):
+    if is_document_query(normalized):
         logger.info(
             "Agent route: DOCUMENT_SEARCH (keyword match) | question=%s",
             question,

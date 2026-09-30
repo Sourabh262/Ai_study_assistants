@@ -40,7 +40,11 @@ class DocumentService:
     def is_ready(self) -> bool:
         return self.vector_store.is_ready
 
-    def process_file(self, file_path: str | Path) -> int:
+    def process_file(
+        self,
+        file_path: str | Path,
+        original_file_name: str | None = None,
+    ) -> int:
         path = Path(file_path)
 
         if not path.exists():
@@ -48,11 +52,17 @@ class DocumentService:
                 f"Document not found: {path}"
             )
 
-        extension = path.suffix.lower()
+        extension = (
+            Path(original_file_name).suffix.lower()
+            if original_file_name
+            else path.suffix.lower()
+        )
+
+        display_name = original_file_name or path.name
 
         logger.info(
             "Processing document: %s",
-            path.name,
+            display_name,
         )
 
         if extension == ".txt":
@@ -78,7 +88,7 @@ class DocumentService:
             embeddings=embeddings,
         )
 
-        self.file_name = path.name
+        self.file_name = display_name
         self.file_type = extension.lstrip(".")
         self.chunk_count = len(chunks)
 
