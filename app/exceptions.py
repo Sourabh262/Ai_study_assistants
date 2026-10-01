@@ -58,7 +58,37 @@ class AgentError(AIStudyAssistantError):
     pass
 
 
+class ToolError(AIStudyAssistantError):
+    """Raised when tool registration, validation, or execution fails."""
+
+    pass
+
+
+class ToolNotFoundError(ToolError):
+    """Raised when a requested tool is not found in the registry."""
+
+    pass
+
+
+class ToolValidationError(ToolError):
+    """Raised when tool input arguments fail schema validation."""
+
+    pass
+
+
+class ToolExecutionError(ToolError):
+    """Raised when a tool fails during execution."""
+
+    pass
+
+
 class LLMError(AIStudyAssistantError):
     """Raised when the LLM request fails."""
+
+    pass
+
+
+class RateLimitError(LLMError):
+    """Raised when the LLM provider returns a rate limit response."""
 
     pass

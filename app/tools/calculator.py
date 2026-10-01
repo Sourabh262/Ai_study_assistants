@@ -5,7 +5,6 @@ import re
 from app.exceptions import CalculatorError
 from app.logging_config import logger
 
-
 _ALLOWED_OPERATORS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -47,24 +46,23 @@ def _evaluate_node(node: ast.AST) -> float:
 
         return operation(_evaluate_node(node.operand))
 
-    raise CalculatorError("Invalid mathematical expression.")
+    raise CalculatorError("Invalid mathematical expression. Code execution is not allowed.")
 
 
 def calculate(expression: str) -> float:
     """
-    Safely evaluate a basic mathematical expression.
+    Safely evaluate a basic mathematical expression without using eval().
 
     Supported:
-    +, -, *, /, %, **, parentheses
+    +, -, *, /, %, **, parentheses, percentages (e.g., '15% of 200')
     """
-
     if not expression or not expression.strip():
         raise CalculatorError("Mathematical expression cannot be empty.")
 
     expression = expression.strip()
 
     # Support simple expressions such as:
-    # "20% of 500" -> "500 * 20 / 100"
+    # "20% of 500" -> 100
     percent_match = re.fullmatch(
         r"(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)",
         expression,
@@ -123,8 +121,16 @@ def calculate(expression: str) -> float:
 
 def format_result(result: float) -> str:
     """Return a clean human-readable calculator result."""
-
     if result.is_integer():
         return str(int(result))
 
     return f"{result:.10f}".rstrip("0").rstrip(".")
+
+
+def execute_calculate(expression: str) -> str:
+    """
+    Tool execution handler for the calculator tool.
+    Returns a string representation of the calculation result.
+    """
+    result = calculate(expression)
+    return format_result(result)

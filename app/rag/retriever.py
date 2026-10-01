@@ -1,5 +1,6 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from app.config import MIN_SIMILARITY, TOP_K
 from app.exceptions import DocumentSearchError
@@ -18,7 +19,6 @@ def clean_search_query(query: str) -> str:
         r"(?i)\bi have uploaded (my )?(resume|document|cv|file|pdf|book)?\b",
         r"(?i)\baccording to my (resume|cv|document|file)\b",
         r"(?i)\b\w+\.(txt|pdf)\b",
-        r"(?i)\b(document|file)\b",
     ]
     cleaned = query
     for f in fillers:
@@ -27,24 +27,19 @@ def clean_search_query(query: str) -> str:
     return cleaned or query
 
 
-
 @dataclass
 class RetrievedChunk:
-    """A document chunk returned by the retriever."""
+    """A document chunk returned by the retriever with metadata."""
 
     text: str
     score: float
     index: int
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class Retriever:
     """
-    Handles semantic retrieval from the vector store.
-
-    Responsibilities:
-    1. Convert the user query into an embedding.
-    2. Search the vector store.
-    3. Return relevant document chunks.
+    Handles semantic retrieval from the vector store with metadata preservation.
     """
 
     def __init__(
@@ -57,44 +52,46 @@ class Retriever:
         self.top_k = top_k
         self.min_similarity = min_similarity
 
-    def retrieve(self, query: str) -> list[RetrievedChunk]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int | None = None,
+    ) -> list[RetrievedChunk]:
         """
-        Retrieve relevant document chunks for a user query.
+        Retrieve relevant document chunks for a query.
 
         Args:
-            query: User's question.
+            query: User's question or search query.
+            top_k: Optional override for number of chunks to return.
 
         Returns:
-            Ranked list of retrieved chunks.
+            Ranked list of retrieved chunks with metadata.
         """
-
         if not query or not query.strip():
-            raise DocumentSearchError(
-                "Search query cannot be empty."
-            )
+            raise DocumentSearchError("Search query cannot be empty.")
 
         if not self.vector_store.is_ready:
             raise DocumentSearchError(
-                "No document is available for search. "
-                "Please upload a document first."
+                "No document is available for search. Please upload a document first."
             )
+
+        k = top_k if top_k is not None and top_k > 0 else self.top_k
 
         try:
             cleaned_query = clean_search_query(query.strip())
             logger.info(
-                "Retrieving document context for query: '%s' (cleaned: '%s')",
+                "Retrieving document context for query: '%s' (cleaned: '%s', top_k=%s)",
                 query.strip(),
                 cleaned_query,
+                k,
             )
 
             query_embedding = generate_query_embedding(cleaned_query)
 
-            results: list[SearchResult] = (
-                self.vector_store.search(
-                    query_embedding=query_embedding,
-                    top_k=self.top_k,
-                    min_similarity=self.min_similarity,
-                )
+            results: list[SearchResult] = self.vector_store.search(
+                query_embedding=query_embedding,
+                top_k=k,
+                min_similarity=self.min_similarity,
             )
 
             retrieved_chunks = [
@@ -102,6 +99,7 @@ class Retriever:
                     text=result.text,
                     score=result.score,
                     index=result.index,
+                    metadata=result.metadata,
                 )
                 for result in results
             ]
@@ -115,34 +113,28 @@ class Retriever:
 
         except DocumentSearchError:
             raise
-
         except Exception as exc:
-            logger.error(
-                "Document retrieval failed: %s",
-                exc,
-            )
-
+            logger.error("Document retrieval failed: %s", exc)
             raise DocumentSearchError(
                 "Failed to retrieve relevant document content."
             ) from exc
 
 
-def format_retrieved_context(
-    chunks: list[RetrievedChunk],
-) -> str:
+def format_retrieved_context(chunks: list[RetrievedChunk]) -> str:
     """
-    Format retrieved chunks into context for the LLM.
+    Format retrieved chunks into structured context for the LLM,
+    including file name, page number, and similarity score.
     """
-
     if not chunks:
         return ""
 
     context_parts: list[str] = []
 
     for position, chunk in enumerate(chunks, start=1):
-        context_parts.append(
-            f"[Source {position} | Similarity: {chunk.score:.3f}]\n"
-            f"{chunk.text}"
-        )
+        source = chunk.metadata.get("source", "Document")
+        page = chunk.metadata.get("page", 1)
+        score_str = f"{chunk.score:.2f}"
+        header = f"[Source {position} | File: {source} | Page: {page} | Similarity: {score_str}]"
+        context_parts.append(f"{header}\n{chunk.text}")
 
     return "\n\n".join(context_parts)

@@ -1,10 +1,10 @@
 from pathlib import Path
 
 from app.exceptions import DocumentError
-from app.loaders.pdf_loader import load_pdf_file
+from app.loaders.pdf_loader import load_pdf_pages
 from app.loaders.text_loader import load_text_file
 from app.logging_config import logger
-from app.rag.chunker import split_text
+from app.rag.chunker import split_pages
 from app.rag.embeddings import generate_embeddings
 from app.rag.retriever import Retriever
 from app.rag.vector_store import VectorStore
@@ -12,26 +12,22 @@ from app.rag.vector_store import VectorStore
 
 class DocumentService:
     """
-    Handles the complete document-processing pipeline.
+    Handles the complete document-processing pipeline with page metadata preservation.
 
     TXT/PDF
        ↓
-    Text extraction
+    Text & Page extraction
        ↓
-    Chunking
+    Chunking with Metadata (source, page)
        ↓
     Embeddings
        ↓
     Vector Store
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.vector_store = VectorStore()
-
-        self.retriever = Retriever(
-            vector_store=self.vector_store
-        )
-
+        self.retriever = Retriever(vector_store=self.vector_store)
         self.file_name: str | None = None
         self.file_type: str | None = None
         self.chunk_count: int = 0
@@ -48,9 +44,7 @@ class DocumentService:
         path = Path(file_path)
 
         if not path.exists():
-            raise DocumentError(
-                f"Document not found: {path}"
-            )
+            raise DocumentError(f"Document not found: {path}")
 
         extension = (
             Path(original_file_name).suffix.lower()
@@ -60,41 +54,37 @@ class DocumentService:
 
         display_name = original_file_name or path.name
 
-        logger.info(
-            "Processing document: %s",
-            display_name,
-        )
+        logger.info("Processing document: %s", display_name)
 
         if extension == ".txt":
-            text = load_text_file(path)
-
+            raw_text = load_text_file(path)
+            pages = [(raw_text, 1)]
         elif extension == ".pdf":
-            text = load_pdf_file(path)
-
+            pages = load_pdf_pages(path)
         else:
             raise DocumentError(
-                "Unsupported file type. "
-                "Only TXT and PDF files are supported."
+                "Unsupported file type. Only TXT and PDF files are supported."
             )
 
-        chunks = split_text(text)
+        chunk_data = split_pages(pages, source_name=display_name)
+        texts = [chunk[0] for chunk in chunk_data]
+        metadatas = [chunk[1] for chunk in chunk_data]
 
-        embeddings = generate_embeddings(chunks)
+        embeddings = generate_embeddings(texts)
 
         self.vector_store.clear()
-
         self.vector_store.add_documents(
-            texts=chunks,
+            texts=texts,
             embeddings=embeddings,
+            metadatas=metadatas,
         )
 
         self.file_name = display_name
         self.file_type = extension.lstrip(".")
-        self.chunk_count = len(chunks)
+        self.chunk_count = len(texts)
 
         logger.info(
-            "Document processed successfully: "
-            "%s chunks created.",
+            "Document processed successfully: %s chunks created with metadata.",
             self.chunk_count,
         )
 
@@ -102,11 +92,8 @@ class DocumentService:
 
     def clear(self) -> None:
         """Clear the currently loaded document."""
-
         self.vector_store.clear()
-
         self.file_name = None
         self.file_type = None
         self.chunk_count = 0
-
         logger.info("Document service cleared.")
